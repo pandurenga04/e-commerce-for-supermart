@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Murugan Supermarket</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel@7.24.7/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Main App Component
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [isAdmin, setIsAdmin] = useState(false);
+      const [view, setView] = useState('home');
+
+      useEffect(() => {
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+          axios.get('http://localhost:5000/api/auth/me', {
+            headers: { Authorization: `Bearer ${token}` }
+          }).then(res => {
+            setUser(res.data);
+            setIsAdmin(res.data.email === 'admin@murugansskarur.com');
+          }).catch(() => localStorage.removeItem('token'));
+        }
+      }, []);
+
+      const handleLogout = () => {
+        localStorage.removeItem('token');
+        setUser(null);
+        setIsAdmin(false);
+        setView('home');
+      };
+
+      return (
+        <div className="min-h-screen bg-gradient-to-r from-green-200 via-blue-200 to-purple-200">
+          <nav className="bg-blue-600 p-4 text-white flex justify-between">
+            <h1 className="text-2xl font-bold">Murugan Supermarket</h1>
+            <div>
+              {user ? (
+                <>
+                  <span className="mr-4">Welcome, {user.name}</span>
+                  <button onClick={handleLogout} className="bg-red-500 px-4 py-2 rounded">Logout</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setView('login')} className="mr-2 bg-green-500 px-4 py-2 rounded">Login</button>
+                  <button onClick={() => setView('signup')} className="bg-yellow-500 px-4 py-2 rounded">Signup</button>
+                </>
+              )}
+            </div>
+          </nav>
+          {view === 'home' && <Home setView={setView} isAdmin={isAdmin} />}
+          {view === 'login' && <Login setUser={setUser} setIsAdmin={setIsAdmin} setView={setView} />}
+          {view === 'signup' && <Signup setView={setView} />}
+          {view === 'products' && <Products user={user} />}
+          {view === 'admin' && isAdmin && <AdminDashboard />}
+        </div>
+      );
+    };
+
+    // Home Component
+    const Home = ({ setView, isAdmin }) => (
+      <div className="p-8 text-center">
+        <h2 className="text-4xl font-bold mb-4 text-blue-800">Welcome to Murugan Supermarket</h2>
+        <p className="text-lg mb-6">Shop for Groceries, Household, Daily Needs, and more!</p>
+        <button
+          onClick={() => setView(isAdmin ? 'admin' : 'products')}
+          className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+        >
+          {isAdmin ? 'Admin Dashboard' : 'Shop Now'}
+        </button>
+      </div>
+    );
+
+    // Login Component
+    const Login = ({ setUser, setIsAdmin, setView }) => {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+
+      const handleLogin = async () => {
+        try {
+          const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+          localStorage.setItem('token', res.data.token);
+          setUser(res.data.user);
+          setIsAdmin(email === 'admin@murugansskarur.com');
+          setView(email === 'admin@murugansskarur.com' ? 'admin' : 'products');
+        } catch (err) {
+          setError('Invalid credentials');
+        }
+      };
+
+      return (
+        <div className="p-8 max-w-md mx-auto bg-white rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold mb-4">Login</h2>
+          {error && <p className="text-red-500">{error}</p>}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <button onClick={handleLogin} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-700">
+            Login
+          </button>
+          <p className="mt-4">
+            New user? <span onClick={() => setView('signup')} className="text-blue-500 cursor-pointer">Signup</span>
+          </p>
+        </div>
+      );
+    };
+
+    // Signup Component
+    const Signup = ({ setView }) => {
+      const [name, setName] = useState('');
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+
+      const handleSignup = async () => {
+        try {
+          await axios.post('http://localhost:5000/api/auth/signup', { name, email, password });
+          setView('login');
+        } catch (err) {
+          setError('Signup failed');
+        }
+      };
+
+      return (
+        <div className="p-8 max-w-md mx-auto bg-white rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold mb-4">Signup</h2>
+          {error && <p className="text-red-500">{error}</p>}
+          <input
+            type="text"
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <button onClick={handleSignup} className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-700">
+            Signup
+          </button>
+          <p className="mt-4">
+            Already have an account? <span onClick={() => setView('login')} className="text-blue-500 cursor-pointer">Login</span>
+          </p>
+        </div>
+      );
+    };
+
+    // Products Component
+    const Products = ({ user }) => {
+      const [categories, setCategories] = useState([]);
+      const [products, setProducts] = useState([]);
+      const [selectedCategory, setSelectedCategory] = useState('All');
+
+      useEffect(() => {
+        // Fetch categories and products
+        axios.get('http://localhost:5000/api/categories').then(res => setCategories(res.data));
+        axios.get('http://localhost:5000/api/products').then(res => setProducts(res.data));
+      }, []);
+
+      const filteredProducts = selectedCategory === 'All'
+        ? products
+        : products.filter(p => p.category === selectedCategory);
+
+      const handleAddToCart = async (productId) => {
+        try {
+          await axios.post('http://localhost:5000/api/orders', { productId, userId: user._id }, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          alert('Added to cart');
+        } catch (err) {
+          alert('Failed to add to cart');
+        }
+      };
+
+      return (
+        <div className="p-8">
+          <h2 className="text-3xl font-bold mb-6 text-blue-800">Shop Our Products</h2>
+          <div className="flex mb-4">
+            <button
+              onClick={() => setSelectedCategory('All')}
+              className={`mr-2 px-4 py-2 rounded ${selectedCategory === 'All' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            >
+              All
+            </button>
+            {categories.map(cat => (
+              <button
+                key={cat._id}
+                onClick={() => setSelectedCategory(cat.name)}
+                className={`mr-2 px-4 py-2 rounded ${selectedCategory === cat.name ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredProducts.map(product => (
+              <div key={product._id} className="bg-white p-4 rounded-lg shadow-lg">
+                <img src={product.image || 'https://via.placeholder.com/150'} alt={product.name} className="w-full h-40 object-cover mb-4 rounded" />
+                <h3 className="text-lg font-bold">{product.name}</h3>
+                <p className="text-gray-600">${product.price}</p>
+                <button
+                  onClick={() => handleAddToCart(product._id)}
+                  className="mt-2 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
+                >
+                  Add to Cart
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // Admin Dashboard Component
+    const AdminDashboard = () => {
+      const [orders, setOrders] = useState([]);
+      const [products, setProducts] = useState([]);
+      const [categories, setCategories] = useState([]);
+      const [newProduct, setNewProduct] = useState({ name: '', price: '', category: '', image: '' });
+      const [newCategory, setNewCategory] = useState('');
+
+      useEffect(() => {
+        axios.get('http://localhost:5000/api/orders').then(res => setOrders(res.data));
+        axios.get('http://localhost:5000/api/products').then(res => setProducts(res.data));
+        axios.get('http://localhost:5000/api/categories').then(res => setCategories(res.data));
+      }, []);
+
+      const handleOrderAction = async (orderId, status) => {
+        try {
+          await axios.put(`http://localhost:5000/api/orders/${orderId}`, { status }, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setOrders(orders.map(o => o._id === orderId ? { ...o, status } : o));
+        } catch (err) {
+          alert('Failed to update order');
+        }
+      };
+
+      const handleAddProduct = async () => {
+        try {
+          const res = await axios.post('http://localhost:5000/api/products', newProduct, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setProducts([...products, res.data]);
+          setNewProduct({ name: '', price: '', category: '', image: '' });
+        } catch (err) {
+          alert('Failed to add product');
+        }
+      };
+
+      const handleDeleteProduct = async (productId) => {
+        try {
+          await axios.delete(`http://localhost:5000/api/products/${productId}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setProducts(products.filter(p => p._id !== productId));
+        } catch (err) {
+          alert('Failed to delete product');
+        }
+      };
+
+      const handleAddCategory = async () => {
+        try {
+          const res = await axios.post('http://localhost:5000/api/categories', { name: newCategory }, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setCategories([...categories, res.data]);
+          setNewCategory('');
+        } catch (err) {
+          alert('Failed to add category');
+        }
+      };
+
+      return (
+        <div className="p-8">
+          <h2 className="text-3xl font-bold mb-6 text-blue-800">Admin Dashboard</h2>
+          
+          {/* Orders Management */}
+          <div className="mb-8">
+            <h3 className="text-2xl font-bold mb-4">Orders</h3>
+            <div className="grid gap-4">
+              {orders.map(order => (
+                <div key={order._id} className="bg-white p-4 rounded-lg shadow-lg">
+                  <p>Order ID: {order._id}</p>
+                  <p>Status: {order.status}</p>
+                  <p>Product: {order.product.name}</p>
+                  <div className="mt-2">
+                    <button
+                      onClick={() => handleOrderAction(order._id, 'Accepted')}
+                      className="mr-2 bg-green-500 text-white px-4 py-2 rounded"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => handleOrderAction(order._id, 'Rejected')}
+                      className="mr-2 bg-red-500 text-white px-4 py-2 rounded"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => handleOrderAction(order._id, 'Cancelled')}
+                      className="bg-yellow-500 text-white px-4 py-2 rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Product Management */}
+          <div className="mb-8">
+            <h3 className="text-2xl font-bold mb-4">Manage Products</h3>
+            <div className="bg-white p-4 rounded-lg shadow-lg mb-4">
+              <input
+                type="text"
+                placeholder="Product Name"
+                value={newProduct.name}
+                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                className="w-full p-2 mb-4 border rounded"
+              />
+              <input
+                type="number"
+                placeholder="Price"
+                value={newProduct.price}
+                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                className="w-full p-2 mb-4 border rounded"
+              />
+              <select
+                value={newProduct.category}
+                onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                className="w-full p-2 mb-4 border rounded"
+              >
+                <option value="">Select Category</option>
+                {categories.map(cat => (
+                  <option key={cat._id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Image URL"
+                value={newProduct.image}
+                onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
+                className="w-full p-2 mb-4 border rounded"
+              />
+              <button onClick={handleAddProduct} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-700">
+                Add Product
+              </button>
+            </div>
+            <div className="grid gap-4">
+              {products.map(product => (
+                <div key={product._id} className="bg-white p-4 rounded-lg shadow-lg flex justify-between">
+                  <div>
+                    <p>{product.name} - ${product.price}</p>
+                    <p>Category: {product.category}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteProduct(product._id)}
+                    className="bg-red-500 text-white px-4 py-2 rounded"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Category Management */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4">Manage Categories</h3>
+            <div className="bg-white p-4 rounded-lg shadow-lg">
+              <input
+                type="text"
+                placeholder="Category Name"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                className="w-full p-2 mb-4 border rounded"
+              />
+              <button onClick={handleAddCategory} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-700">
+                Add Category
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Render App
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
